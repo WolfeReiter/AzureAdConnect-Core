@@ -32,7 +32,7 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
             return await Task.WhenAll(tasks);
         }
 
-        GraphServiceClient GetAuthenticatedClient()
+        public GraphServiceClient GetAuthenticatedClient()
         {
             var authenticationProvider = new DelegateAuthenticationProvider(
                 async(requestMessage) => 
