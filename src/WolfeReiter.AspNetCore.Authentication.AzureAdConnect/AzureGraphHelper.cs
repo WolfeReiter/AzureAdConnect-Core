@@ -6,16 +6,19 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.Graph;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
+using Microsoft.Extensions.Logging;
 
 namespace WolfeReiter.AspNetCore.Authentication.AzureAD
 {
     public class AzureGraphHelper
     {
-        public AzureGraphHelper(AzureAdConnectOptions options)
+        public AzureGraphHelper(AzureAdConnectOptions options, ILoggerFactory logger)
         {
             Options = options;
+            Logger = logger.CreateLogger<AzureGraphHelper> ();
         }
 
+        ILogger Logger { get; set; }
         AzureAdConnectOptions Options { get; set; }
 
         public async Task<IEnumerable<Group>> AzureGroups(ClaimsPrincipal principal)
@@ -24,12 +27,27 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
             var ids = GroupIDs(principal);
             var graphClient = GetAuthenticatedClient();
 
-            var tasks = new List<Task<Group>>();
+            var tasks = new List<Task<Task<Group>>>();
             foreach(var id in ids)
             {
-                tasks.Add(graphClient.Groups[id].Request().GetAsync());
+                //If a Group is deleted from Azure but that group is attached to a User,
+                //an exception will by thrown that the requested resource does not exist.
+                //If an exception is thrown by any task in Task.WhenAll() the results of all of the 
+                //tasks are discarded.
+                //However, attaching a Continuation to a Task changes the behavior so that the exception
+                //can be interrogated later using the .IsFaulted property.
+                var task = graphClient.Groups[id].Request().GetAsync()
+                    .ContinueWith(t => t, TaskContinuationOptions.ExecuteSynchronously);
+                tasks.Add(task);
             }
-            return await Task.WhenAll(tasks);
+            var complete = await Task.WhenAll(tasks);
+
+            foreach(var task in complete.Where(x => x.IsFaulted))
+            {
+                Logger.LogWarning(task.Exception, "Fault querying for AzureAD Group");
+            }
+
+            return complete.Where(x => x.Status == TaskStatus.RanToCompletion).Select(x => x.Result);
         }
 
         public GraphServiceClient GetAuthenticatedClient()

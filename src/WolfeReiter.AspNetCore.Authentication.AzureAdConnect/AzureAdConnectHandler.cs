@@ -19,10 +19,13 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
     /// </summary>
     public class AzureAdConnectHandler : OpenIdConnectHandler, IAuthenticationSignOutHandler
     {
+        new ILogger Logger { get; set; }
+        ILoggerFactory LoggerFactory { get; set; }
         public AzureAdConnectHandler(IOptionsMonitor<OpenIdConnectOptions> options, ILoggerFactory logger, HtmlEncoder htmlEncoder, UrlEncoder encoder, ISystemClock clock)
             : base(options, logger, htmlEncoder, encoder, clock)
         {
-
+            Logger = logger.CreateLogger<AzureAdConnectHandler>();
+            LoggerFactory = logger;
         }
 
         protected AzureGraphHelper AzureGraphHelper()
@@ -30,7 +33,7 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
             if (Options is AzureAdConnectOptions) AzureAdConnectOptions = (AzureAdConnectOptions)Options;
             else AzureAdConnectOptions = new AzureAdConnectOptions(Options);
 
-            return new AzureGraphHelper(AzureAdConnectOptions);
+            return new AzureGraphHelper(AzureAdConnectOptions, this.LoggerFactory);
         }
 
         protected AzureAdConnectOptions AzureAdConnectOptions { get; set; }
@@ -100,7 +103,7 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
                 {
                     Logger.LogWarning(ex, "Exception Mapping Groups to Roles");
                     identity.AddClaim(new Claim(ClaimTypes.AuthorizationDecision, String.Format("AzureAD-Group-Lookup-Error:{0:yyyy-MM-dd_HH:mm.ss}Z", DateTime.UtcNow)));
-                    //Handle intermittnent server problem by keeping old groups if they existed.
+                    //Handle intermittent server problem by keeping old groups if they existed.
                     if (oldGroups.Any()) 
                     {
                         grouple = new Tuple<DateTime, IEnumerable<string>>(DateTime.UtcNow.AddSeconds(-(AzureAdConnectOptions.GroupCacheTtlSeconds / 2)), oldGroups);
