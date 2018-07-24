@@ -31,13 +31,23 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
 
         protected AzureGraphHelper AzureGraphHelper()
         {
-            if (Options is AzureAdConnectOptions) AzureAdConnectOptions = (AzureAdConnectOptions)Options;
-            else AzureAdConnectOptions = new AzureAdConnectOptions(Options);
-
             return new AzureGraphHelper(AzureAdConnectOptions, this.LoggerFactory);
         }
 
-        protected AzureAdConnectOptions AzureAdConnectOptions { get; set; }
+        AzureAdConnectOptions _azureAdConnectOptions = null;
+        protected AzureAdConnectOptions AzureAdConnectOptions 
+        {
+             get 
+             {
+                 if(_azureAdConnectOptions is null) 
+                 {
+                    if (Options is AzureAdConnectOptions) _azureAdConnectOptions = (AzureAdConnectOptions)Options;
+                    else _azureAdConnectOptions = new AzureAdConnectOptions(Options);
+                 }
+                 return _azureAdConnectOptions;
+             }
+             set { _azureAdConnectOptions = value; }
+        }
 
         /// <summary>
         /// Invoked to process incoming OpenIdConnect messages.
