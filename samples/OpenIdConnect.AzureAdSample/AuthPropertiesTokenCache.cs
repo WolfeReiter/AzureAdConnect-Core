@@ -50,7 +50,7 @@ namespace OpenIdConnect.AzureAdSample
             if (_authProperties.Items.TryGetValue(TokenCacheKey, out cachedTokensText))
             {
                 var cachedTokens = Convert.FromBase64String(cachedTokensText);
-                Deserialize(cachedTokens);
+                DeserializeAdalV3(cachedTokens);
             }
         }
 
@@ -69,7 +69,7 @@ namespace OpenIdConnect.AzureAdSample
             // if state changed
             if (HasStateChanged)
             {
-                var cachedTokens = Serialize();
+                var cachedTokens = SerializeAdalV3();
                 var cachedTokensText = Convert.ToBase64String(cachedTokens);
                 _authProperties.Items[TokenCacheKey] = cachedTokensText;
             }
@@ -82,7 +82,7 @@ namespace OpenIdConnect.AzureAdSample
             {
                 AfterAccessNotificationWithProperties(args);
 
-                var cachedTokens = Serialize();
+                var cachedTokens = SerializeAdalV3();
                 var cachedTokensText = Convert.ToBase64String(cachedTokens);
                 _authProperties.Items[TokenCacheKey] = cachedTokensText;
                 _httpContext.SignInAsync(_signInScheme, _principal, _authProperties).Wait();
