@@ -10,6 +10,7 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
     public interface ITokenCacheFactory
     {
         TokenCache CreateForUser(ClaimsPrincipal user);
+        TokenCache Create();
     }
 
     public class TokenCacheFactory : ITokenCacheFactory
@@ -42,6 +43,11 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
                 UserId     = userId;
             }
             return TokenCache;
+        }
+
+        public TokenCache Create()
+        {
+            return CreateForUser(null);
         }
     }
 }
