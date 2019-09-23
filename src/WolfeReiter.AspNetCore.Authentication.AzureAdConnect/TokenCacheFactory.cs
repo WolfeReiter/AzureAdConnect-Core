@@ -9,45 +9,30 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
 {
     public interface ITokenCacheFactory
     {
-        TokenCache CreateForUser(ClaimsPrincipal user);
-        TokenCache Create();
+        TokenCache Instance { get; }
     }
 
     public class TokenCacheFactory : ITokenCacheFactory
     {
-        private readonly IDistributedCache _distributedCache;
-        private readonly IDataProtectionProvider _dataProtectionProvider;
+        private IDistributedCache DistributedCache { get; set; }
+        private IDataProtectionProvider DataProtectionProvider { get; set; }
         //Token cache is cached in-memory in this instance to avoid loading data multiple times during the request
         //For this reason this factory should always be registered as Scoped
         private TokenCache TokenCache { get; set; }
-        private string UserId { get; set; }
 
         public TokenCacheFactory(IDistributedCache distributedCache, IDataProtectionProvider dataProtectionProvider)
         {
-            _distributedCache = distributedCache;
-            _dataProtectionProvider = dataProtectionProvider;
+            DistributedCache       = distributedCache;
+            DataProtectionProvider = dataProtectionProvider;
         }
 
-        public TokenCache CreateForUser(ClaimsPrincipal user)
+        public TokenCache Instance
         {
-            string userId = user.ObjectIdentifier();
-
-            if (TokenCache != null)
+            get 
             {
-                if (userId != UserId) throw new Exception("The cached token cache is for a different user! Make sure the token cache factory is registered as Scoped!");
+                if (TokenCache == null) TokenCache = new AzureAdDistributedTokenCache(DistributedCache, DataProtectionProvider);
                 return TokenCache;
             }
-            else
-            {
-                TokenCache = new AzureAdDistributedTokenCache( _distributedCache, _dataProtectionProvider, userId);
-                UserId     = userId;
-            }
-            return TokenCache;
-        }
-
-        public TokenCache Create()
-        {
-            return CreateForUser(null);
         }
     }
 }

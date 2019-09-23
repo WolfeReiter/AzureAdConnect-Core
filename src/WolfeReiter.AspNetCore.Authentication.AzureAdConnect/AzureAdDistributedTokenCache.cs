@@ -8,33 +8,30 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
 {
     public class AzureAdDistributedTokenCache : TokenCache
     {
-        private readonly IDistributedCache _distributedCache;
-        private readonly IDataProtector _dataProtector;
-        private readonly string _userId;
+        private IDistributedCache DistributedCache { get; set; }
+        private IDataProtector DataProtector { get; set; }
 
         /// <summary>
         /// Constructs a token cache
         /// </summary>
         /// <param name="distributedCache">Distributed cache used for storing tokens</param>
         /// <param name="dataProtectionProvider">The protector provider for encrypting/decrypting the cached data</param>
-        /// <param name="userId">The user's unique identifier</param>
-        public AzureAdDistributedTokenCache(IDistributedCache distributedCache, IDataProtectionProvider dataProtectionProvider, string userId)
+        public AzureAdDistributedTokenCache(IDistributedCache distributedCache, IDataProtectionProvider dataProtectionProvider)
         {
-            _distributedCache = distributedCache;
-            _dataProtector    = dataProtectionProvider.CreateProtector("AadTokens");
-            _userId           = userId;
-            BeforeAccess      = BeforeAccessNotification;
-            AfterAccess       = AfterAccessNotification;
+            DistributedCache = distributedCache;
+            DataProtector    = dataProtectionProvider.CreateProtector("AadTokens");
+            BeforeAccess     = BeforeAccessNotification;
+            AfterAccess      = AfterAccessNotification;
         }
 
         private void BeforeAccessNotification(TokenCacheNotificationArgs args)
         {
-            byte[] cachedData = _distributedCache.Get(GetCacheKey());
+            byte[] cachedData = DistributedCache.Get(CacheKey(args.UniqueId));
 
             if (cachedData != null)
             {
                 //Decrypt and deserialize the cached data
-                DeserializeAdalV3(_dataProtector.Unprotect(cachedData));
+                DeserializeAdalV3(DataProtector.Unprotect(cachedData));
             }
             else
             {
@@ -47,17 +44,11 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
         {
             if (HasStateChanged)
             {
-                var data = _dataProtector.Protect(SerializeAdalV3());
-
-                _distributedCache.Set(GetCacheKey(), data, new DistributedCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1)
-                });
-
+                var data = DataProtector.Protect(SerializeAdalV3());
+                DistributedCache.Set(CacheKey(args.UniqueId), data);
                 HasStateChanged = false;
             }
         }
-
-        private string GetCacheKey() => $"{_userId}_TokenCache";
+        private string CacheKey(string uniqueId) => $"{uniqueId}_TokenCache";
     }
 }
