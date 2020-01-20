@@ -56,6 +56,7 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
             this.StringDataFormat              = options.StringDataFormat;
             this.TokenValidationParameters     = options.TokenValidationParameters;
             this.UseTokenLifetime              = options.UseTokenLifetime;
+            this.UsePkce                       = options.UsePkce;
         }
 
         /// <summary>
