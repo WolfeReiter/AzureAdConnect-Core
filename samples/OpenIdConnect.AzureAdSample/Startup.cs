@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
@@ -19,7 +20,7 @@ namespace OpenIdConnect.AzureAdSample
 {
     public class Startup
     {
-        public Startup(IHostingEnvironment env)
+        public Startup(IWebHostEnvironment env)
         {
             var builder = new ConfigurationBuilder()
                 .SetBasePath(env.ContentRootPath);
@@ -57,6 +58,11 @@ namespace OpenIdConnect.AzureAdSample
                 o.ResponseType = OpenIdConnectResponseType.CodeIdToken;
                 o.SignedOutRedirectUri = "/signed-out";
                 o.CallbackPath = "/Account/SignIn";
+                // Safari 12 infinite redirect during login workaround
+                o.ResponseType = "code";
+                o.ResponseMode = "query";
+                o.UsePkce = false;
+                
                 // GetClaimsFromUserInfoEndpoint = true,
                 o.Events = new OpenIdConnectEvents()
                 {
