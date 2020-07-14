@@ -21,7 +21,6 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
     /// </summary>
     public class AzureAdConnectHandler : OpenIdConnectHandler, IAuthenticationSignOutHandler
     {
-        new ILogger Logger { get; set; }
         ILoggerFactory LoggerFactory { get; set; }
 
         readonly string RoleFilterPattern;
@@ -29,7 +28,6 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
         public AzureAdConnectHandler(IOptionsMonitor<OpenIdConnectOptions> options, ILoggerFactory logger, HtmlEncoder htmlEncoder, UrlEncoder encoder, ISystemClock clock, IConfiguration configuration)
             : base(options, logger, htmlEncoder, encoder, clock)
         {
-            Logger = logger.CreateLogger<AzureAdConnectHandler>();
             LoggerFactory = logger;
             RoleFilterPattern = configuration.GetValue<string>("AzureAD:groupNameFilterPattern", "");
             RemoveAzureGroupClaims = configuration.GetValue<bool>("AzureAD:removeGroupClaims", true);
@@ -91,17 +89,6 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
                 }
             }
             return result;  
-        }
-
-         protected override async Task<bool> HandleRemoteSignOutAsync()
-         {
-             return await base.HandleRemoteSignOutAsync();
-         }
-
-        static ConcurrentDictionary<string, Tuple<DateTime, IEnumerable<string>>> PrincipalRoleCache { get; set; }
-        static AzureAdConnectHandler()
-        {
-            PrincipalRoleCache = new ConcurrentDictionary<string, Tuple<DateTime, IEnumerable<string>>>();
         }
     }
 }
