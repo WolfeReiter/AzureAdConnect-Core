@@ -8,9 +8,11 @@ using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
+using System.Text.RegularExpressions;
 
 namespace WolfeReiter.AspNetCore.Authentication.AzureAD
 {
@@ -19,14 +21,18 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
     /// </summary>
     public class AzureAdConnectHandler : OpenIdConnectHandler, IAuthenticationSignOutHandler
     {
-        object _lock = new Object();
         new ILogger Logger { get; set; }
         ILoggerFactory LoggerFactory { get; set; }
-        public AzureAdConnectHandler(IOptionsMonitor<OpenIdConnectOptions> options, ILoggerFactory logger, HtmlEncoder htmlEncoder, UrlEncoder encoder, ISystemClock clock)
+
+        readonly string RoleFilterPattern;
+        readonly bool RemoveAzureGroupClaims;
+        public AzureAdConnectHandler(IOptionsMonitor<OpenIdConnectOptions> options, ILoggerFactory logger, HtmlEncoder htmlEncoder, UrlEncoder encoder, ISystemClock clock, IConfiguration configuration)
             : base(options, logger, htmlEncoder, encoder, clock)
         {
             Logger = logger.CreateLogger<AzureAdConnectHandler>();
             LoggerFactory = logger;
+            RoleFilterPattern = configuration.GetValue<string>("AzureAD:groupNameFilterPattern", "");
+            RemoveAzureGroupClaims = configuration.GetValue<bool>("AzureAD:removeGroupClaims", true);
         }
 
         protected AzureGraphHelper AzureGraphHelper()
@@ -56,80 +62,36 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
         protected override async Task<HandleRequestResult> HandleRemoteAuthenticateAsync()
         {
             var result = await base.HandleRemoteAuthenticateAsync();
-            if (result.Succeeded) await AddAzureAdGroupRoleClaims(result.Principal);
-            return result;  
-        }
-
-        async Task AddAzureAdGroupRoleClaims(ClaimsPrincipal incomingPrincipal)
-        {
-            if (incomingPrincipal != null && incomingPrincipal.Identity.IsAuthenticated == true)
+            if (result.Succeeded) 
             {
-                Tuple<DateTime, IEnumerable<string>> grouple = null;
-                IEnumerable<string> groups                   = Enumerable.Empty<string>();
-                IEnumerable<string> oldGroups                = Enumerable.Empty<string>();
-                var identity                                 = (ClaimsIdentity)incomingPrincipal.Identity;
-                var identityKey                              = identity.Name;
-                var cacheValid                               = false;
+                ClaimsIdentity claimsIdentity = result.Principal.Identity as ClaimsIdentity;
+                Regex roleFilter = null;
+                if (!String.IsNullOrWhiteSpace(RoleFilterPattern)) roleFilter = new Regex(RoleFilterPattern);
 
-                try
+                //convert Azure "groups" claim of Guids to Role claims by looking up the Group DisplayName in Microsoft Graph
+                var groups = (await AzureGraphHelper().AzureGroups(result.Principal)).Select(x => x.DisplayName);
+                foreach (var group in groups)
                 {
-                    if (PrincipalRoleCache.TryGetValue(identityKey, out grouple))
+                    //the filter regex will only add matched role names that are used by the application in order to limit the cookie size
+                    if (roleFilter == null || roleFilter.IsMatch(group))
                     {
-                        lock(_lock) //prevent concurrent access to grouple Tuple
-                        {
-                            if(grouple != null)
-                            {
-                                var expiration = grouple.Item1.AddSeconds(AzureAdConnectOptions.GroupCacheTtlSeconds);
-                                if (DateTime.UtcNow > expiration ||
-                                    grouple.Item2.Count() != identity.Claims.Count(x => x.Type == "groups"))
-                                {
-                                    oldGroups = grouple.Item2;
-                                    //don't need to check return because if it failed, then the entry was removed already
-                                    //or we'll try again.
-                                    //don't re-use the "grouple" variable because the out of TryRemove can be null.
-                                    Tuple<DateTime, IEnumerable<string>> removedGrouple = null;
-                                    PrincipalRoleCache.TryRemove(identityKey, out removedGrouple);
-                                }
-                                else
-                                {
-                                    cacheValid = true;
-                                    groups = grouple.Item2;
-                                }
-                            }
-                        }
+                        claimsIdentity.AddClaim(new Claim(ClaimTypes.Role, group, ClaimValueTypes.String, "AzureAD"));
                     }
 
-                    if (!cacheValid)
-                    {
-                        var result = await AzureGraphHelper().AzureGroups(incomingPrincipal);
-                        groups = result.Select(x => x.DisplayName);
-                        grouple = new Tuple<DateTime, IEnumerable<string>>(DateTime.UtcNow, groups);
-                        PrincipalRoleCache.AddOrUpdate(identityKey, grouple, (key, oldGrouple) => grouple);
-                    }
-
-                    foreach (var group in groups)
-                    {
-                        //add AzureAD Group claims as Roles.
-                        identity.AddClaim(new Claim(ClaimTypes.Role, group, ClaimValueTypes.String, "AzureAD"));
-                    }
                 }
-                catch (Exception ex)
+
+                //remove groups claims -- which are simply GUIDs -- in order to reduce cookie size
+                if (RemoveAzureGroupClaims)
                 {
-                    Logger.LogWarning(ex, "Exception Mapping Groups to Roles");
-                    identity.AddClaim(new Claim(ClaimTypes.AuthorizationDecision, String.Format("AzureAD-Group-Lookup-Error:{0:yyyy-MM-dd_HH:mm.ss}Z", DateTime.UtcNow)));
-                    //Handle intermittent server problem by keeping old groups if they existed.
-                    if (oldGroups.Any()) 
+                    //remove Azure "groups" claims to save space
+                    var groupClaims = claimsIdentity.Claims.Where(x => x.Type == "groups").ToList();
+                    foreach (var claim in groupClaims)
                     {
-                        grouple = new Tuple<DateTime, IEnumerable<string>>(DateTime.UtcNow.AddSeconds(-(AzureAdConnectOptions.GroupCacheTtlSeconds / 2)), oldGroups);
-                        PrincipalRoleCache.AddOrUpdate(identityKey, grouple, (key, oldGrouple) => grouple);
-                        foreach (var group in oldGroups)
-                        {
-                            //add AzureAD Group claims as Roles.
-                            identity.AddClaim(new Claim(ClaimTypes.Role, group, ClaimValueTypes.String, "AzureAD"));
-                        }
+                        claimsIdentity.TryRemoveClaim(claim);
                     }
                 }
             }
+            return result;  
         }
 
          protected override async Task<bool> HandleRemoteSignOutAsync()
