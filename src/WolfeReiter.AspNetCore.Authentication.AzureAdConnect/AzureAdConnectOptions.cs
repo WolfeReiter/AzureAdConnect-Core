@@ -6,59 +6,19 @@ using Microsoft.IdentityModel.Clients.ActiveDirectory;
 
 namespace WolfeReiter.AspNetCore.Authentication.AzureAD
 {
-    public class AzureAdConnectOptions : OpenIdConnectOptions
+    /// <summary>
+    /// Options to be configured and loaded as a Singleton.
+    /// </summary>
+    public class AzureAdConnectOptions 
     {
-
         public AzureAdConnectOptions()
         {
-            GraphAuthority       = "https://graph.microsoft.com";
-            GraphApiVersion      = "v1.0";
-            GroupCacheTtlSeconds = 60 * 60;
+            GraphAuthority         = "https://graph.microsoft.com";
+            GraphApiVersion        = "v1.0";
+            GroupCacheTtlSeconds   = 60 * 60;
+            RoleFilterPattern      = "";
+            RemoveAzureGroupClaims = true;
         }
-
-        public AzureAdConnectOptions(OpenIdConnectOptions options) : this()
-        {
-            this.AuthenticationMethod          = options.AuthenticationMethod;
-            this.Authority                     = options.Authority;
-            this.Backchannel                   = options.Backchannel;
-            this.BackchannelHttpHandler        = options.BackchannelHttpHandler;
-            this.BackchannelTimeout            = options.BackchannelTimeout;
-            this.CallbackPath                  = options.CallbackPath;
-            this.ClaimsIssuer                  = options.ClaimsIssuer;
-            this.ClientId                      = options.ClientId;
-            this.ClientSecret                  = options.ClientSecret;
-            this.Configuration                 = options.Configuration;
-            this.ConfigurationManager          = options.ConfigurationManager;
-            this.CorrelationCookie             = options.CorrelationCookie;
-            this.DataProtectionProvider        = options.DataProtectionProvider;
-            this.DisableTelemetry              = options.DisableTelemetry;
-            this.Events                        = options.Events;
-            this.EventsType                    = options.EventsType;
-            this.GetClaimsFromUserInfoEndpoint = options.GetClaimsFromUserInfoEndpoint;
-            this.MetadataAddress               = options.MetadataAddress;
-            this.NonceCookie                   = options.NonceCookie;
-            this.ProtocolValidator             = options.ProtocolValidator;
-            this.RefreshOnIssuerKeyNotFound    = options.RefreshOnIssuerKeyNotFound;
-            this.RemoteAuthenticationTimeout   = options.RemoteAuthenticationTimeout;
-            this.RemoteSignOutPath             = options.RemoteSignOutPath;
-            this.RequireHttpsMetadata          = options.RequireHttpsMetadata;
-            this.Resource                      = options.Resource;
-            this.ResponseMode                  = options.ResponseMode;
-            this.ResponseType                  = options.ResponseType;
-            this.SaveTokens                    = options.SaveTokens;
-            this.SecurityTokenValidator        = options.SecurityTokenValidator;
-            this.SignedOutCallbackPath         = options.SignedOutCallbackPath;
-            this.SignedOutRedirectUri          = options.SignedOutRedirectUri;
-            this.SignInScheme                  = options.SignInScheme;
-            this.SignOutScheme                 = options.SignOutScheme;
-            this.SkipUnrecognizedRequests      = options.SkipUnrecognizedRequests;
-            this.StateDataFormat               = options.StateDataFormat;
-            this.StringDataFormat              = options.StringDataFormat;
-            this.TokenValidationParameters     = options.TokenValidationParameters;
-            this.UseTokenLifetime              = options.UseTokenLifetime;
-            this.UsePkce                       = options.UsePkce;
-        }
-
         /// <summary>
         /// URL to invoke Graph API. Defaults to &quot;https://graph.microsoft.com"&quot;.
         /// </summary>
@@ -77,5 +37,35 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
         /// </summary>
         /// <returns></returns>
         public int GroupCacheTtlSeconds { get; set; }
+
+        /// <summary>
+        /// regex pattern to filter group names. Only matching group names from Microsoft Graph will be converted to Role names in the ClaimsIdentity.
+        /// </summary>
+        /// <value></value>
+        public string RoleFilterPattern { get; set; }
+
+        /// <summary>
+        /// When true, remove group IDs after processing them to get group names and convert those to Roles. This is to reduce cookie size. Default is true.
+        /// </summary>
+        /// <value></value>
+        public bool RemoveAzureGroupClaims { get; set; }
+
+        /// <summary>
+        /// Same value as in OpenIdConnectOptions.
+        /// </summary>
+        /// <value></value>
+        public string ClientId { get; set; }
+
+        /// <summary>
+        /// Same value as in OpenIdConnectOptions.
+        /// </summary>
+        /// <value></value>
+        public string ClientSecret { get; set; }
+        
+        /// <summary>
+        /// Same value as in OpenIdConnectOptions.
+        /// </summary>
+        /// <value></value>
+        public string Authority { get; set; }
     }
 }

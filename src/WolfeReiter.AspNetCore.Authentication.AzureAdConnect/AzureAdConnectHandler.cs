@@ -21,36 +21,14 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
     /// </summary>
     public class AzureAdConnectHandler : OpenIdConnectHandler, IAuthenticationSignOutHandler
     {
-        ILoggerFactory LoggerFactory { get; set; }
-
-        readonly string RoleFilterPattern;
-        readonly bool RemoveAzureGroupClaims;
-        public AzureAdConnectHandler(IOptionsMonitor<OpenIdConnectOptions> options, ILoggerFactory logger, HtmlEncoder htmlEncoder, UrlEncoder encoder, ISystemClock clock, IConfiguration configuration)
+        readonly AzureGraphHelper GraphHelper;
+        readonly AzureAdConnectOptions AzureOptions;
+        public AzureAdConnectHandler(IOptionsMonitor<OpenIdConnectOptions> options, ILoggerFactory logger, HtmlEncoder htmlEncoder, 
+            UrlEncoder encoder, ISystemClock clock, AzureAdConnectOptions azureOptions, AzureGraphHelper graphHelper)
             : base(options, logger, htmlEncoder, encoder, clock)
         {
-            LoggerFactory = logger;
-            RoleFilterPattern = configuration.GetValue<string>("AzureAD:groupNameFilterPattern", "");
-            RemoveAzureGroupClaims = configuration.GetValue<bool>("AzureAD:removeGroupClaims", true);
-        }
-
-        protected AzureGraphHelper AzureGraphHelper()
-        {
-            return new AzureGraphHelper(AzureAdConnectOptions, this.LoggerFactory);
-        }
-
-        AzureAdConnectOptions _azureAdConnectOptions = null;
-        protected AzureAdConnectOptions AzureAdConnectOptions 
-        {
-             get 
-             {
-                 if(_azureAdConnectOptions is null) 
-                 {
-                    if (Options is AzureAdConnectOptions options) _azureAdConnectOptions = options;
-                    else _azureAdConnectOptions = new AzureAdConnectOptions(Options);
-                 }
-                 return _azureAdConnectOptions;
-             }
-             set { _azureAdConnectOptions = value; }
+            AzureOptions = azureOptions;
+            GraphHelper = graphHelper;
         }
 
         /// <summary>
@@ -64,10 +42,10 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
             {
                 ClaimsIdentity claimsIdentity = result.Principal.Identity as ClaimsIdentity;
                 Regex roleFilter = null;
-                if (!String.IsNullOrWhiteSpace(RoleFilterPattern)) roleFilter = new Regex(RoleFilterPattern);
+                if (!String.IsNullOrWhiteSpace(AzureOptions.RoleFilterPattern)) roleFilter = new Regex(AzureOptions.RoleFilterPattern);
 
                 //convert Azure "groups" claim of Guids to Role claims by looking up the Group DisplayName in Microsoft Graph
-                var groups = (await AzureGraphHelper().AzureGroups(result.Principal)).Select(x => x.DisplayName);
+                var groups = (await GraphHelper.AzureGroups(result.Principal)).Select(x => x.DisplayName);
                 foreach (var group in groups)
                 {
                     //the filter regex will only add matched role names that are used by the application in order to limit the cookie size
@@ -78,7 +56,7 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
                 }
 
                 //remove groups claims -- which are simply GUIDs -- in order to reduce cookie size
-                if (RemoveAzureGroupClaims)
+                if (AzureOptions.RemoveAzureGroupClaims)
                 {
                     //remove Azure "groups" claims to save space
                     var groupClaims = claimsIdentity.Claims.Where(x => x.Type == "groups").ToList();

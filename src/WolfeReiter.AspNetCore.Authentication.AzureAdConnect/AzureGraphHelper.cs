@@ -10,6 +10,9 @@ using Microsoft.Extensions.Logging;
 
 namespace WolfeReiter.AspNetCore.Authentication.AzureAD
 {
+    /// <summary>
+    /// Service to be configured and loaded as a Singleton.
+    /// </summary>
     public class AzureGraphHelper
     {
         public AzureGraphHelper(AzureAdConnectOptions options, ILoggerFactory logger)
