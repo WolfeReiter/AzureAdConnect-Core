@@ -47,7 +47,7 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
              {
                  if(_azureAdConnectOptions is null) 
                  {
-                    if (Options is AzureAdConnectOptions) _azureAdConnectOptions = (AzureAdConnectOptions)Options;
+                    if (Options is AzureAdConnectOptions options) _azureAdConnectOptions = options;
                     else _azureAdConnectOptions = new AzureAdConnectOptions(Options);
                  }
                  return _azureAdConnectOptions;
@@ -77,7 +77,6 @@ namespace WolfeReiter.AspNetCore.Authentication.AzureAD
                     {
                         claimsIdentity.AddClaim(new Claim(ClaimTypes.Role, group, ClaimValueTypes.String, "AzureAD"));
                     }
-
                 }
 
                 //remove groups claims -- which are simply GUIDs -- in order to reduce cookie size
